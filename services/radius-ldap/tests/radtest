@@ -1,0 +1,5 @@
+# Should pass
+radtest toto tata 127.0.0.1 0 localclient
+
+# Shouldn't pass
+radtest toto titi 127.0.0.1 0 localclient
