@@ -1,0 +1,5 @@
+services:
+  radius-ldap:
+    build:
+      context: ../services/radius-ldap
+      dockerfile: ./Dockerfile
