@@ -1,5 +1,118 @@
 services:
-  radius-ldap:
+
+  api-gateway:
     build:
-      context: ../services/radius-ldap
+      context: ../api-gateway
       dockerfile: ./Dockerfile
+    environment:
+      - SERVER_PORT=8080
+      - EUREKA_URI=http://service-registry:8761/eureka
+    ports:
+      - 8080:8080
+    profiles: [donotstart]
+
+  service-registry:
+    build:
+      context: ../service-registry
+      dockerfile: ./Dockerfile
+    environment:
+      - SERVER_PORT=8761
+    ports:
+      - 8761:8761
+      
+  posts-service:
+    container_name: posts-service
+    build:
+      context: ../services/posts-service
+      dockerfile: ./Dockerfile
+    environment:
+      - SERVER_PORT=8080
+      - MYSQL_DB=jdbc:mysql://posts-database:3306/posts?createDatabaseIfNotExist=true
+      - EUREKA_URI=http://service-registry:8761/eureka
+    ports:
+      - 8081:8080
+    depends_on:
+      - posts-database
+      - users-service
+      
+  posts-database:
+    container_name: posts-database
+    image: mysql
+    environment: 
+      - MYSQL_ROOT_PASSWORD=48i0L4Iad6NeeYr1Lm0O
+    ports:
+      - 3306:3306
+    
+  users-service:
+    container_name: users-service
+    build:
+      context: ../services/users-service
+      dockerfile: ./Dockerfile
+    environment:
+      - SERVER_PORT=8080
+      - MYSQL_DB=jdbc:mysql://posts-database:3306/posts?createDatabaseIfNotExist=true
+      - EUREKA_URI=http://service-registry:8761/eureka
+      - LDAP_URI=ldap://openldap:389
+    ports:
+      - 8082:8080
+    depends_on:
+      - openldap
+      
+  openldap:
+    image: osixia/openldap:1.5.0
+    container_name: openldap
+    environment:
+      LDAP_LOG_LEVEL: "256"
+      LDAP_ORGANISATION: "HE-Arc"
+      LDAP_DOMAIN: "he-arc.ch"
+      LDAP_BASE_DN: "dc=he-arc,dc=ch"
+      LDAP_ADMIN_PASSWORD: "passw0rd"
+      LDAP_CONFIG_PASSWORD: "passw0rd"
+      LDAP_READONLY_USER: "false"
+      LDAP_RFC2307BIS_SCHEMA: "false"
+      LDAP_BACKEND: "mdb"
+      LDAP_TLS: "true"
+      LDAP_TLS_CRT_FILENAME: "ldap.crt"
+      LDAP_TLS_KEY_FILENAME: "ldap.key"
+      LDAP_TLS_DH_PARAM_FILENAME: "dhparam.pem"
+      LDAP_TLS_CA_CRT_FILENAME: "ca.crt"
+      LDAP_TLS_ENFORCE: "false"
+      LDAP_TLS_CIPHER_SUITE: "SECURE256:-VERS-SSL3.0"
+      LDAP_TLS_VERIFY_CLIENT: "demand"
+      LDAP_REPLICATION: "false"
+      KEEP_EXISTING_CONFIG: "false"
+      LDAP_REMOVE_CONFIG_AFTER_SETUP: "true"
+      LDAP_SSL_HELPER_PREFIX: "ldap"
+    tty: true
+    stdin_open: true
+    volumes:
+      - /var/lib/ldap
+      - /etc/ldap/slapd.d
+      - /container/service/slapd/assets/certs/
+    ports:
+      - "389:389"
+      - "636:636"
+    domainname: "he-arc.ch"
+    hostname: "ldap"
+      
+  phpmyadmin:
+    image: phpmyadmin
+    ports:
+      - "8085:80"
+    environment:
+      - PMA_ARBITRARY=1
+    depends_on:
+      - posts-database
+    profiles: [debug]
+
+  phpldapadmin:
+    image: osixia/phpldapadmin:latest
+    container_name: phpldapadmin
+    environment:
+      PHPLDAPADMIN_LDAP_HOSTS: "openldap"
+      PHPLDAPADMIN_HTTPS: "false"
+    ports:
+      - "8086:80"
+    depends_on:
+      - openldap
+    profiles: [debug]
